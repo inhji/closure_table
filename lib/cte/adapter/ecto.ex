@@ -289,7 +289,16 @@ defmodule CTE.Adapter.Ecto do
         where: p.descendant == ^ancestor,
         select: %{ancestor: p.ancestor, descendant: type(^leaf, :integer), depth: p.depth + 1}
 
-    new_records = repo.all(descendants) ++ [%{ancestor: leaf, descendant: leaf, depth: 0}]
+    ancestor =
+      from p in paths,
+        where: p.descendant == ^ancestor,
+        where: p.ancestor == ^ancestor,
+        select: p.depth
+
+    new_depth = repo.one(ancestor) || 0
+
+    new_records = repo.all(descendants) ++ [%{ancestor: leaf, descendant: leaf, depth: new_depth}]
+
     descendants = Enum.map(new_records, fn r -> [r.ancestor, r.descendant] end)
 
     with {nr, _r} when nr > 0 <- repo.insert_all(paths, new_records, on_conflict: :nothing),
